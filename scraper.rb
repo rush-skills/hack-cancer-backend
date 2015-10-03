@@ -7,6 +7,12 @@ require 'selenium-webdriver'
 require 'nokogiri'
 require 'open-uri'
 require 'digest/sha1'
+require 'words_counted'
+require 'sinatra/cross_origin'
+
+configure do
+  enable :cross_origin
+end
 
 DOCACHING = false
 
@@ -29,17 +35,20 @@ get '/*' do
     content_type :json
     compute(url).to_json
   end
+
 end
 
 def compute(url)
   is_gov = check_gov(url)
   answer = JSON.parse(open(diff_it(url)).read)
   a = analyze_diff answer
-  {gov: is_gov, answer: a}
+  a[:is_gov] = is_gov
+  {answer: a}
 end
 
+
 def check_gov(url)
-  puts url.split("/")[1]
+  # puts url.split("/")[1]
   domain = url.split("/")[1].split('.')
   gov_domains = ["gov","ac","edu"]
   gov_domains.include? domain[-1] or gov_domains.include? domain[-2]
@@ -55,16 +64,22 @@ end
 def analyze_diff(data)
   begin
     object = data['objects'][0]
-    fields = {sentiment: object['sentiment'], text: object['text'], date: object['date'], estimated_date: object['estimatedDate']}
+    fields = {sentiment: object['sentiment'], text: object['text'], date: object['date'], estimated_date: object['estimatedDate'],title: object['title'], title_size: object['title'].split(' ').count, author: object['author']}
     score = compute_diff_score(fields)
-    fields[:score] = score
+    fields[:days_old] = score.to_i
+    fields[:average_letters_per_word] = count_words(object['text'])
     return fields
   rescue
 
   end
 end
 
+def count_words(text)
+  counter = WordsCounted.count(text)
+  counter.average_chars_per_word
+end
+
 def compute_diff_score(fields)
-  puts Date.parse(fields[:date]) - Date.today
-  Date.parse(fields[:date]) - Date.today
+  # puts Date.parse(fields[:date]) - Date.today
+  Date.today - Date.parse(fields[:date])
 end

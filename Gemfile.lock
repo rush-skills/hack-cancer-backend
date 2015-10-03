@@ -24,10 +24,12 @@ GEM
       rack (~> 1.4)
       rack-protection (~> 1.4)
       tilt (>= 1.3, < 3)
+    sinatra-cross_origin (0.3.2)
     spreadsheet (1.0.4)
       ruby-ole (>= 1.0)
     tilt (2.0.1)
     websocket (1.2.2)
+    words_counted (0.1.5)
 
 PLATFORMS
   ruby
@@ -39,7 +41,9 @@ DEPENDENCIES
   rack (= 1.5.2)
   selenium-webdriver
   sinatra
+  sinatra-cross_origin
   spreadsheet
+  words_counted
 
 BUNDLED WITH
    1.10.6
