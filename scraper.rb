@@ -36,7 +36,7 @@ get '/*' do
       return documents.to_a.first[:data]
     else
       data = compute(url).to_json
-      settings.mongo_db.insert_one({url: url,data: data})
+      settings.mongo_db.insert_one({url: url,data: data, score: data['response']['score']})
       return data
     end
   else
