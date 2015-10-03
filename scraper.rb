@@ -11,16 +11,18 @@ require 'words_counted'
 require 'sinatra/cross_origin'
 require 'mongo'
 require 'json/ext'
+require 'twilio-ruby'
 
 configure do
   enable :cross_origin
-
+  set :sms, true
+  set :caching, false
+  set :twilio_sid, ENV['TWILIO_SID']
+  set :twilio_token, ENV['TWILIO_TOKEN']
   db = Mongo::Client.new([ '127.0.0.1:27017' ], :database => 'hackcancer')
   set :mongo_db, db[:hackcancer]
   db[:hackcancer].indexes.create_one({:url => 1}, :unique => true)
 end
-
-DOCACHING = false
 
 get '/' do
   return "send me url plz"
@@ -30,7 +32,7 @@ get '/*' do
   content_type :json
   # Fetch and parse HTML document
   url = params["splat"][0].to_s
-  if DOCACHING
+  if settings.caching
     documents = settings.mongo_db.find(:url => url)
     if !documents.to_a.first.nil?
       return documents.to_a.first[:data]
@@ -52,6 +54,7 @@ def compute(url)
     a[:is_gov] = is_gov
     flags = compute_flags a
     score = compute_score flags
+    twilio_noti if score == 1 && settings.sms
     {response: {answer: a,flags: flags, score: score}}
   rescue
     {response: {score: -1}}
@@ -128,6 +131,19 @@ def compute_score(data)
   base -= 50 if data[:super_old_flag]
   base -= 50 if data[:text_size_flag]
   base <= 0? 1:0
+end
+
+def twilio_noti
+  # set up a client to talk to the Twilio REST API
+  account_sid = settings.twilio_sid
+  auth_token = settings.twilio_token
+  @client = Twilio::REST::Client.new account_sid, auth_token
+
+  @client.account.messages.create({
+    :from => '(617) 925-6342',
+    :to => '8579288498',
+    :body => 'The patient is trying to visit a site flagged dangerous by us.',
+  })
 end
 
 # ---------MONGO DB METHODS ------------
