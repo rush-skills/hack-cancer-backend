@@ -9,33 +9,39 @@ require 'open-uri'
 require 'digest/sha1'
 require 'words_counted'
 require 'sinatra/cross_origin'
+require 'mongo'
+require 'json/ext'
 
 configure do
   enable :cross_origin
+
+  db = Mongo::Client.new([ '127.0.0.1:27017' ], :database => 'hackcancer')
+  set :mongo_db, db[:hackcancer]
+  db[:hackcancer].indexes.create_one({:url => 1}, :unique => true)
 end
 
-DOCACHING = false
+DOCACHING = true
 
 get '/' do
   return "send me url plz"
 end
 
 get '/*' do
+  content_type :json
   # Fetch and parse HTML document
   url = params["splat"][0].to_s
   if DOCACHING
-    hash = Digest::SHA1.hexdigest(url)
-    cache_file = File.join("cache",hash.to_s)
-    if !File.exist?(cache_file) || (File.mtime(cache_file) < (Time.now - 3600*24*5))
-      data = compute(url)
-      File.open(cache_file,"w"){ |f| f << data }
+    documents = settings.mongo_db.find(:url => url)
+    if !documents.to_a.first.nil?
+      return documents.to_a.first[:data]
+    else
+      data = compute(url).to_json
+      settings.mongo_db.insert_one({url: url,data: data})
+      return data
     end
-    send_file cache_file, :type => 'application/json'
   else
-    content_type :json
     compute(url).to_json
   end
-
 end
 
 def compute(url)
@@ -121,4 +127,28 @@ def compute_score(data)
   base -= 50 if data[:super_old_flag]
   base -= 50 if data[:text_size_flag]
   base <= 0? 1:0
+end
+
+# ---------MONGO DB METHODS ------------
+
+helpers do
+  # a helper method to turn a string ID
+  # representation into a BSON::ObjectId
+  def object_id val
+    begin
+      BSON::ObjectId.from_string(val)
+    rescue BSON::ObjectId::Invalid
+      nil
+    end
+  end
+
+  def document_by_id id
+    id = object_id(id) if String === id
+    if id.nil?
+      {}.to_json
+    else
+      document = settings.mongo_db.find(:_id => id).to_a.first
+      (document || {}).to_json
+    end
+  end
 end

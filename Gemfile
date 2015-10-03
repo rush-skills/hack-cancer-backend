@@ -9,3 +9,5 @@ gem 'nokogiri'
 gem 'puma'
 gem 'words_counted'
 gem "sinatra-cross_origin"
+gem 'mongo', '~> 2.1'
+gem 'bson_ext'
