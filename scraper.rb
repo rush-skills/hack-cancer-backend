@@ -15,8 +15,8 @@ require 'twilio-ruby'
 
 configure do
   enable :cross_origin
-  set :sms, true
-  set :caching, false
+  set :sms, false
+  set :caching, true
   set :twilio_sid, ENV['TWILIO_SID']
   set :twilio_token, ENV['TWILIO_TOKEN']
   db = Mongo::Client.new([ '127.0.0.1:27017' ], :database => 'hackcancer')
@@ -38,7 +38,9 @@ get '/*' do
       return documents.to_a.first[:data]
     else
       data = compute(url).to_json
-      settings.mongo_db.insert_one({url: url,data: data, score: data['response']['score']})
+      if data['response']['score'] != -1
+        settings.mongo_db.insert_one({url: url,data: data, score: data['response']['score']})
+      end
       return data
     end
   else
@@ -48,10 +50,11 @@ end
 
 def compute(url)
   begin
-    is_gov = check_gov(url)
     answer = JSON.parse(open(diff_it(url)).read)
     a = analyze_diff answer
-    a[:is_gov] = is_gov
+    a[:is_gov] = check_gov(url)
+    a[:whitelist] = check_whitelist(url)
+    a[:blacklist] = check_blacklist(url)
     flags = compute_flags a
     score = compute_score flags
     twilio_noti if score == 1 && settings.sms
@@ -61,6 +64,13 @@ def compute(url)
   end
 end
 
+def check_whitelist(url)
+  ["http://google.com"].any? { |white| url.include? white}
+end
+
+def check_blacklist(url)
+  ["www.quackwatch.org","www.aaets.org","www.doctoryourself.com"].any? { |black| url.include? black}
+end
 
 def check_gov(url)
   # puts url.split("/")[1]
@@ -115,9 +125,11 @@ def compute_flags(data)
   flags[:title_flag] = data[:title_size] > 20 if data[:title_size]
   flags[:sentiment_flag] = data[:sentiment] < -0.4 if data[:sentiment]
   flags[:text_size_flag] = data[:total_words] < 100 || data[:total_words] > 5000
-  flags[:old_flag] = data[:days_old] > 365*3 if data[:days_old]
-  flags[:super_old_flag] = data[:days_old] > 365*5 if data[:days_old]
+  flags[:old_flag] = data[:days_old] > 365*1 if data[:days_old]
+  flags[:super_old_flag] = data[:days_old] > 365*3 if data[:days_old]
   flags[:gov_flag] = data[:is_gov]
+  flags[:whitelist] = data[:whitelist]
+  flags[:blacklist] = data[:blacklist]
   flags
 end
 
@@ -130,6 +142,8 @@ def compute_score(data)
   base -= 50 if data[:old_flag]
   base -= 50 if data[:super_old_flag]
   base -= 50 if data[:text_size_flag]
+  base += 1000 if data[:whitelist]
+  base -= 1000 if data[:blacklist]
   base <= 0? 1:0
 end
 
