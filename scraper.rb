@@ -87,8 +87,9 @@ def analyze_diff(data)
       fields[:days_old] = score.to_i
     end
     if fields[:text]
-      fields[:average_letters_per_word] = count_words(object['text'])[0]
-      fields[:total_words] = count_words(object['text'])[1]
+      temp = count_words(object['text'])
+      fields[:average_letters_per_word] = temp[0]
+      fields[:total_words] = temp[1]
     end
     return fields
   rescue
@@ -107,10 +108,10 @@ end
 
 def compute_flags(data)
   flags = Hash.new(false)
-  flags[:words_flag] = data[:average_letters_per_word] > 7 if data[:average_letters_per_word]
-  flags[:title_flag] = data[:title_size] > 25 if data[:title_size]
+  flags[:words_flag] = data[:average_letters_per_word] > 6 if data[:average_letters_per_word]
+  flags[:title_flag] = data[:title_size] > 20 if data[:title_size]
   flags[:sentiment_flag] = data[:sentiment] < -0.4 if data[:sentiment]
-  flags[:text_size_flag] = data[:total_words] < 100 or data[:total_words] > 5000 if data[:total_words]
+  flags[:text_size_flag] = data[:total_words] < 100 || data[:total_words] > 5000
   flags[:old_flag] = data[:days_old] > 365*3 if data[:days_old]
   flags[:super_old_flag] = data[:days_old] > 365*5 if data[:days_old]
   flags[:gov_flag] = data[:is_gov]
