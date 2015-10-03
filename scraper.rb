@@ -20,7 +20,7 @@ configure do
   db[:hackcancer].indexes.create_one({:url => 1}, :unique => true)
 end
 
-DOCACHING = true
+DOCACHING = false
 
 get '/' do
   return "send me url plz"
@@ -109,7 +109,7 @@ def compute_flags(data)
   flags = Hash.new(false)
   flags[:words_flag] = data[:average_letters_per_word] > 7 if data[:average_letters_per_word]
   flags[:title_flag] = data[:title_size] > 25 if data[:title_size]
-  flags[:sentiment_flag] = data[:sentiment] < -0.5 if data[:sentiment]
+  flags[:sentiment_flag] = data[:sentiment] < -0.4 if data[:sentiment]
   flags[:text_size_flag] = data[:total_words] < 100 or data[:total_words] > 5000 if data[:total_words]
   flags[:old_flag] = data[:days_old] > 365*3 if data[:days_old]
   flags[:super_old_flag] = data[:days_old] > 365*5 if data[:days_old]
@@ -123,7 +123,7 @@ def compute_score(data)
   base -= 50 if data[:sentiment_flag]
   base -= 50 if data[:title_flag]
   base -= 50 if data[:words_flag]
-  base -= 50 if data[:age_flag]
+  base -= 50 if data[:old_flag]
   base -= 50 if data[:super_old_flag]
   base -= 50 if data[:text_size_flag]
   base <= 0? 1:0
